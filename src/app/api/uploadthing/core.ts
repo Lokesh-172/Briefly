@@ -24,7 +24,7 @@ export const ourFileRouter = {
           key: file.key,
           name: file.name,
           userId: metadata.userId,
-          url: file.url,
+          url: file.ufsUrl,
           uploadStaus: "PROCESSING"
         }
       })
