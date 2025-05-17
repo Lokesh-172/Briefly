@@ -7,7 +7,7 @@ import { UTApi } from "uploadthing/server";
 
 export const appRouter = router({
   // ...
-  
+
   authCallback: publicProcedure.query(async () => {
     const { getUser } = getKindeServerSession();
     const user = await getUser();
@@ -66,13 +66,12 @@ export const appRouter = router({
 
       if (!file) throw new TRPCError({ code: "NOT_FOUND" });
       const utapi = new UTApi();
-      await utapi.deleteFiles(file.key)
+      await utapi.deleteFiles(file.key);
       await db.file.delete({
         where: {
           id: input.id,
         },
       });
-      
     }),
   getFile: privateProcedure
     .input(z.object({ key: z.string() }))
@@ -85,9 +84,23 @@ export const appRouter = router({
           userId,
         },
       });
-      if(!file) throw new TRPCError({code: "NOT_FOUND"});
+      if (!file) throw new TRPCError({ code: "NOT_FOUND" });
 
       return file;
+    }),
+
+  getFileUploadStatus: privateProcedure
+    .input(z.object({ fileId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const file = await db.file.findFirst({
+        where: {
+          id: input.fileId,
+          userId: ctx.userId,
+        },
+      });
+      if(!file) return {status : "PENDING" as const}
+      
+      return {status: file.uploadStaus}
     }),
 });
 // Export type router type signature,

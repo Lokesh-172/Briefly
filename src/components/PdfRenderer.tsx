@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { useResizeDetector } from "react-resize-detector";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,11 +29,14 @@ interface PdfRendererProps {
 
 const PdfRenderer = ({ url }: PdfRendererProps) => {
   const { width, ref } = useResizeDetector();
-
   const [numPages, setNumPages] = useState<number>();
   const [currPage, setCurrPage] = useState<number>(1);
-  const[isLoading, setIsLoading] = useState<boolean>(false);
-  const[renderedScale, setRenderedScale] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [renderedScale, setRenderedScale] = useState<number | null>(null);
+  
+  // Important: PDF size constraint
+  const [pdfOriginalWidth, setPdfOriginalWidth] = useState<number | null>(null);
+  
   const customPageValidator = z.object({
     page: z
       .string()
@@ -41,6 +44,7 @@ const PdfRenderer = ({ url }: PdfRendererProps) => {
   });
 
   type TCustomPageValidator = z.infer<typeof customPageValidator>;
+  
   const handlePageSubmit = ({ page }: TCustomPageValidator) => {
     setCurrPage(Number(page));
     setValue("page", String(page));
@@ -67,9 +71,23 @@ const PdfRenderer = ({ url }: PdfRendererProps) => {
     { label: "200%", value: 2 },
     { label: "250%", value: 2.5 },
   ];
+  
+  // Use scale adjustment when window resizes
+  useEffect(() => {
+    if (pdfOriginalWidth && width) {
+      // If PDF is wider than container, scale down
+      if (pdfOriginalWidth > width) {
+        const newScale = (width / pdfOriginalWidth) * scale;
+        if (newScale !== scale) {
+          setScale(newScale);
+        }
+      }
+    }
+  }, [width, pdfOriginalWidth]);
 
   return (
     <div className="w-full bg-white rounded-md shadow flex flex-col items-center">
+      {/* Navigation bar - fixed height */}
       <div className="h-14 w-full border-b border-zinc-200 flex items-center justify-between px-2">
         <div className="flex items-center gap-1.5">
           <Button
@@ -119,31 +137,21 @@ const PdfRenderer = ({ url }: PdfRendererProps) => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                className="gap-1.5 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300"
-                variant="outline"
+                className="gap-1.5"
+                variant="ghost"
                 size="sm"
                 aria-label="zoom"
               >
-                <Search className="h-4 w-4 mr-1 text-gray-500" />
+                <Search className="h-4 w-4" />
                 <span>{Math.round(scale * 100)}%</span>
-                <ChevronDown className="h-3 w-3 ml-1 text-gray-500" />
+                <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="bg-white rounded-md shadow-lg border border-gray-200 py-1 w-36"
-            >
-              <div className="px-2 py-1.5 text-sm font-medium text-gray-700 border-b border-gray-100">
-                Zoom Level
-              </div>
+            <DropdownMenuContent>
               {zoomLevels.map((level) => (
                 <DropdownMenuItem
                   key={level.label}
-                  className={cn(
-                    "px-3 py-1.5 text-sm cursor-pointer hover:bg-gray-100",
-                    scale === level.value && "bg-gray-50 font-medium"
-                  )}
-                  onClick={() => setScale(level.value)}
+                  onSelect={() => setScale(level.value)}
                 >
                   {level.label}
                 </DropdownMenuItem>
@@ -161,9 +169,20 @@ const PdfRenderer = ({ url }: PdfRendererProps) => {
           <PdfFullScreen fileUrl={url}/>
         </div>
       </div>
+      
+      {/* PDF content area with proper scrolling */}
       <div className="flex-1 w-full max-h-screen">
-        <SimpleBar autoHide={false} className="min-h-[calc(100vh-10rem)]">
-          <div ref={ref}>
+        <SimpleBar
+          autoHide={false}
+          className="max-h-[calc(100vh-10rem)] overflow-x-auto">
+          <div 
+            ref={ref} 
+            className="min-w-full"
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+            }}
+          >
             <Document
               loading={
                 <div className="flex justify-center">
@@ -171,45 +190,48 @@ const PdfRenderer = ({ url }: PdfRendererProps) => {
                 </div>
               }
               onLoadError={() => {
-                return toast.error("Something went wrong", {
+                toast.error("Something went wrong", {
                   description: "Please try again later!!",
                 });
+                setIsLoading(false);
               }}
               onLoadSuccess={({ numPages }) => {
                 setNumPages(numPages);
+                setIsLoading(false);
               }}
               file={url}
-              className="max-h-full"
             >
-              {isLoading && renderedScale ? (
+              <div style={{ position: 'relative' }}>
                 <Page
                   width={width ? width : 1}
                   pageNumber={currPage}
                   scale={scale}
                   rotate={rotation}
-                  key={'@' + renderedScale}
+                  key={'@' + scale}
+                  loading={
+                    <div className='flex justify-center'>
+                      <Loader2 className='my-24 h-6 w-6 animate-spin' />
+                    </div>
+                  }
+                  onRenderSuccess={(page) => {
+                    // Store original width for scaling calculations
+                    if (!pdfOriginalWidth) {
+                      setPdfOriginalWidth(page.width);
+                    }
+                    setRenderedScale(scale);
+                  }}
                 />
-              ) : null}
-
-              <Page
-                className={cn(isLoading ? 'hidden' : '')}
-                width={width ? width : 1}
-                pageNumber={currPage}
-                scale={scale}
-                rotate={rotation}
-                key={'@' + scale}
-                loading={
-                  <div className='flex justify-center'>
-                    <Loader2 className='my-24 h-6 w-6 animate-spin' />
-                  </div>
-                }
-                onRenderSuccess={() =>
-                  setRenderedScale(scale)
-                }
-              />
+              </div>
             </Document>
           </div>
         </SimpleBar>
+        
+        {/* Full-page loading overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          </div>
+        )}
       </div>
     </div>
   );
