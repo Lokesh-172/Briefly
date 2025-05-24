@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { z } from "zod";
 import { UTApi } from "uploadthing/server";
 import { INFINITE_QUERY_LIMT } from "@/config/infinite-query";
+import pinecone from "@/lib/pinecone";
 
 export const appRouter = router({
   // ...
@@ -73,6 +74,16 @@ export const appRouter = router({
           id: input.id,
         },
       });
+      await db.message.deleteMany({
+        where: {
+          fileId: file.id
+        }
+      })
+      const index = pinecone.Index('briefly');
+      const namespace = index.namespace(file.id)
+      await namespace.deleteAll()
+
+
     }),
   getFile: privateProcedure
     .input(z.object({ key: z.string() }))
