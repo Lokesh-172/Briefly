@@ -1,6 +1,6 @@
-# Quill - A Modern Fullstack SaaS-Platform
+# Briefly - A Modern Fullstack SaaS-Platform
 
-Built with the Next.js 13.5 App Router, tRPC, TypeScript, Prisma & Tailwind
+Built with the Next.js 15.2 App Router, tRPC, TypeScript, Prisma & Tailwind
 
 ## Features
 

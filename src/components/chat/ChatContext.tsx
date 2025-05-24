@@ -1,8 +1,7 @@
 import { trpc } from "@/app/_trpc/client";
 import { INFINITE_QUERY_LIMT } from "@/config/infinite-query";
-import { context } from "@pinecone-database/pinecone/dist/assistant/data/context";
 import { useMutation } from "@tanstack/react-query";
-import { Children, createContext, ReactNode, useRef, useState } from "react";
+import { createContext, ReactNode, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type StreamResponse = {
@@ -62,8 +61,8 @@ export const ChatContextProvider = ({ fileId, children }: Props) => {
               pageParams: [],
             };
           }
-          let newPages = [...old.pages];
-          let latestPage = newPages[0]!;
+          const newPages = [...old.pages];
+          const latestPage = newPages[0]!;
           latestPage.messages = [
             {
               createdAt: new Date().toISOString(),
@@ -114,11 +113,11 @@ export const ChatContextProvider = ({ fileId, children }: Props) => {
           (old) => {
             if (!old) return { pages: [], pageParams: [] };
 
-            let isAiResponseCreated = old.pages.some((page) =>
+            const isAiResponseCreated = old.pages.some((page) =>
               page.messages.some((message) => message.id === "ai-response")
             );
 
-            let updatedPages = old.pages.map((page) => {
+            const updatedPages = old.pages.map((page) => {
               if (page === old.pages[0]) {
                 let updatedMessages;
 

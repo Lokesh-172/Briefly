@@ -17,7 +17,7 @@ export const ourFileRouter = {
       maxFileCount: 1,
     },
   })
-    .middleware(async ({ req }) => {
+    .middleware(async () => {
       const { getUser } = getKindeServerSession();
       const user = await getUser();
 
@@ -54,7 +54,6 @@ export const ourFileRouter = {
         // Load PDF document
         const loader = new PDFLoader(blob);
         const pageLevelDocs = await loader.load();
-        const pageAmt = pageLevelDocs.length;
         // Initialize embeddings
         const googleApiKey = process.env.GEMINI_API_KEY;
         if (!googleApiKey) {
@@ -90,7 +89,7 @@ export const ourFileRouter = {
         }
 
       } catch (error) {
-
+        console.log(error);
         // Update file status to FAILED if an ID is available
         if (createdFileId) {
           await db.file.update({

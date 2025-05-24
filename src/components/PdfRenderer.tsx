@@ -44,6 +44,7 @@ const PdfRenderer = ({ url }: PdfRendererProps) => {
   const { width, ref } = useResizeDetector()
   const renderTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const documentRef = useRef<any>(null)  
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 

@@ -11,7 +11,7 @@ interface MessageProps {
 }
 
 const Message = forwardRef<HTMLDivElement, MessageProps>(
-  ({ message, isNextMessageSamePerson }, ref) => {
+  ({ message, isNextMessageSamePerson }) => {
     return (
       <div
         className={cn("flex items-end", {
@@ -77,5 +77,7 @@ const Message = forwardRef<HTMLDivElement, MessageProps>(
     );
   }
 );
+
+Message.displayName = 'Message'
 
 export default Message;
