@@ -27,8 +27,6 @@ const ChatWrapper = ({ fileId }: ChatWrapperProps) => {
     }
   );
 
-  console.log("Upload status data:", data);
-
   if (isLoading || !data) {
     return (
       <div className="relative min-h-full bg-zinc-50 flex divide-y divide-zinc-200 flex-col justify-between gap-2">
