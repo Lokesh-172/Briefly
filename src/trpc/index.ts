@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { db } from "@/db";
 import { z } from "zod";
 import { UTApi } from "uploadthing/server";
+import { INFINITE_QUERY_LIMT } from "@/config/infinite-query";
 
 export const appRouter = router({
   // ...
@@ -102,6 +103,51 @@ export const appRouter = router({
       
       return {status: file.uploadStaus}
     }),
+
+    getFileMessages: privateProcedure.input(z.object({
+      limit: z.number().min(1).max(100).nullish(),
+      cursor: z.string().nullish(),
+      fileId: z.string(),
+    })).query(async ({ input, ctx }) => {
+      const { cursor, fileId } = input;
+      const { userId } = ctx;
+      const limit = input?.limit ?? INFINITE_QUERY_LIMT;
+      const file = await db.file.findFirst({
+        where:{
+          id: fileId,
+          userId,
+        }
+      })
+      if(!file) throw new TRPCError({ code: "NOT_FOUND" });
+      const messages = await db.message.findMany({
+        take:limit+1,
+        where:{
+          fileId,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        cursor: cursor ? { id: cursor } : undefined,
+        select:{
+          id: true,
+          isUserMessage: true,
+          createdAt: true,
+          text: true,
+        }
+      })
+      let nextCursor: typeof cursor | undefined = undefined;
+      if(messages.length > limit) {
+        const nextItem = messages.pop();
+        nextCursor = nextItem?.id;
+      }
+
+      return{
+        messages,
+        nextCursor
+      }
+    }
+  ),
+
 });
 // Export type router type signature,
 // NOT the router itself.
