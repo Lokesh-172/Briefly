@@ -41,6 +41,8 @@ interface PdfRendererProps {
 }
 
 const PdfRenderer = ({ url }: PdfRendererProps) => {
+  console.log("Recieved by PDF Rednerer:" , url);
+  
   const { width, ref } = useResizeDetector()
   const renderTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)

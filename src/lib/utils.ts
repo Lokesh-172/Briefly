@@ -34,15 +34,14 @@ export function constructMetadata({
     openGraph: {
       title,
       description,
-      images: [
-        {
-          url: image
-        }
-      ]
+      images: [{ url: image }]
     },
-    icons,
+    icons: {
+      icon: icons,
+      shortcut: icons,
+      apple: icons
+    },
     metadataBase: new URL('https://briefly-omega.vercel.app'),
-    themeColor: '#FFF',
     ...(noIndex && {
       robots: {
         index: false,

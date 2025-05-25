@@ -12,6 +12,8 @@ interface PageProps {
 
 const Page = async ({ params }: PageProps) => {
   const { fileid } = await params
+  console.log("File id:", fileid);
+  
 
   const { getUser } = getKindeServerSession()
   const user = await getUser()
@@ -25,6 +27,7 @@ const Page = async ({ params }: PageProps) => {
       userId: user.id,
     },
   })
+  console.log(file);
 
   if (!file) notFound()
 
