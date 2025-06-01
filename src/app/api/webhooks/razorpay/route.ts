@@ -65,15 +65,15 @@ export async function POST(req: NextRequest) {
         const order = await orderRes.json()
         console.log('Order details:', order)
 
-        // Check if order has subscription linked to it
-        const subscriptionId = order.notes?.subscription_id || order.receipt?.includes('sub_') ? order.receipt : null
+        // Get customer ID from order notes or payment
+        const orderCustomerId = order.notes?.customerId || customerId
+        
+        if (orderCustomerId) {
+          console.log('Customer ID found:', orderCustomerId)
 
-        if (subscriptionId) {
-          console.log('Subscription found in order:', subscriptionId)
-
-          // Fetch subscription details
-          const subscriptionRes = await fetch(
-            `https://api.razorpay.com/v1/subscriptions/${subscriptionId}`,
+          // Fetch subscriptions for this customer
+          const subscriptionsRes = await fetch(
+            `https://api.razorpay.com/v1/subscriptions?customer_id=${orderCustomerId}`,
             {
               method: 'GET',
               headers: {
@@ -86,42 +86,46 @@ export async function POST(req: NextRequest) {
             }
           )
 
-          if (!subscriptionRes.ok) {
-            throw new Error(`Razorpay Subscription API error: ${subscriptionRes.status}`)
+          if (!subscriptionsRes.ok) {
+            throw new Error(`Razorpay Subscriptions API error: ${subscriptionsRes.status}`)
           }
 
-          const subscription = await subscriptionRes.json()
-          console.log('Subscription details:', subscription)
+          const subscriptionsData = await subscriptionsRes.json()
+          console.log('Customer subscriptions:', subscriptionsData)
 
-          if (!subscription.id || !subscription.plan_id || !subscription.current_end) {
-            console.error('Invalid subscription data:', subscription)
+          // Get the most recent active subscription
+          const activeSubscription = subscriptionsData.items?.find(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (sub: any) => sub.status === 'active' || sub.status === 'authenticated' || sub.status === 'created'
+          ) || subscriptionsData.items?.[0] // fallback to first subscription if none active
+
+          if (activeSubscription) {
+            console.log('Subscription found:', activeSubscription)
+
+          if (!activeSubscription.id || !activeSubscription.plan_id || !activeSubscription.current_end) {
+            console.error('Invalid subscription data:', activeSubscription)
             return new Response('Invalid subscription data', { status: 400 })
-          }
-
-          // Use customer ID from subscription or payment
-          const finalCustomerId = subscription.customer_id || customerId
-
-          if (!finalCustomerId) {
-            console.error('No customer ID found in subscription or payment')
-            return new Response('Missing customer ID', { status: 400 })
           }
 
           // Update user subscription details in your DB
           await db.user.update({
             where: {
-              razorpayCustomerId: finalCustomerId,
+              razorpayCustomerId: orderCustomerId,
             },
             data: {
-              razorpaySubscriptionId: subscription.id,
-              razorpayPriceId: subscription.plan_id,
-              razorpayCurrentPeriodEnd: new Date(subscription.current_end * 1000),
+              razorpaySubscriptionId: activeSubscription.id,
+              razorpayPriceId: activeSubscription.plan_id,
+              razorpayCurrentPeriodEnd: new Date(activeSubscription.current_end * 1000),
             },
           })
 
-          console.log('Successfully updated user subscription for customer:', finalCustomerId)
+          console.log('Successfully updated user subscription for customer:', orderCustomerId)
         } else {
-          console.log('No subscription linked to this order:', orderId)
+          console.log('No subscriptions found for customer:', orderCustomerId)
         }
+      } else {
+        console.log('No customer ID found in order or payment')
+      }
 
       } catch (apiError) {
         console.error('Error processing payment.authorized webhook:', apiError)
