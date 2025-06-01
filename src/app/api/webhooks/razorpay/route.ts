@@ -7,6 +7,8 @@ export async function POST(req: NextRequest) {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET!
     const signature = req.headers.get('x-razorpay-signature') || ''
     const body = await req.text()
+    console.log(body);
+    
 
     // Secure signature validation
     const expectedSignature = crypto
@@ -25,6 +27,8 @@ export async function POST(req: NextRequest) {
     }
 
     const event = JSON.parse(body)
+    console.log(event);
+
     console.log('Webhook event received:', event.event)
 
     // Use subscription payload for subscription events
