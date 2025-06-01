@@ -167,7 +167,7 @@ export const appRouter = router({
 
 createRazorpaySession: privateProcedure.mutation(async ({ ctx }) => {
   const { userId } = ctx;
-  const billingUrl = absoluteUrl("/dashboard/billing");
+  const billingUrl = ("/dashboard/billing");
 
   if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
 
