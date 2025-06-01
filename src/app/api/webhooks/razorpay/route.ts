@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
           const activeSubscription = customerSubscriptions.find(
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (sub: any) => sub.status === 'active' || sub.status === 'authenticated'|| sub.status ==='created'
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ) || customerSubscriptions.sort((a: any, b: any) => b.created_at - a.created_at)[0]
 
           if (activeSubscription) {
