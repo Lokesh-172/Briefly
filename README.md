@@ -12,8 +12,8 @@ Built with the Next.js 15.2 App Router, tRPC, TypeScript, Prisma & Tailwind
 - 🎨 Clean, Modern UI Using 'shadcn-ui'  
 - 🚀 Optimistic UI Updates for a Great UX  
 - ⚡ Infinite Message Loading for Performance  
-- 📤 Intuitive Drag n’ Drop Uploads  
-- ✨ Instant Loading States  
+- ✨ Instant L- 📤 Intuitive Drag n’ Drop Uploads  
+oading States  
 - 🔧 Modern Data Fetching Using tRPC & Zod  
 - 🧠 LangChain for Infinite AI Memory  
 - 🌲 Pinecone as our Vector Storage  
