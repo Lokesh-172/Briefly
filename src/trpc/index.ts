@@ -181,18 +181,16 @@ createRazorpaySession: privateProcedure.mutation(async ({ ctx }) => {
   // Already subscribed case
   console.log(subscriptionPlan);
   
-    if (subscriptionPlan.isSubscribed) {
+  if (subscriptionPlan.isSubscribed) {
     return { 
-      orderId: null,
-      amount: null,
-      currency: null,
+      subscriptionId: null,
+      planId: null,
       customerId: null,
       customerDetails: null,
       billingUrl,
       isAlreadySubscribed: true 
     };
   }
-
 
   // Get Pro plan details
   const plan = PLANS.find((plan) => plan.name === "Pro");
@@ -220,11 +218,13 @@ createRazorpaySession: privateProcedure.mutation(async ({ ctx }) => {
       });
     }
 
-    // Create Razorpay Order
-    const order = await razorpay.orders.create({
-      amount: plan.price.amount * 100, // Convert to paise
-      currency: "INR",
-      receipt: `ord_${userId.slice(-8)}_${Date.now().toString().slice(-8)}`, 
+    // Create Razorpay Subscription
+    const subscription = await razorpay.subscriptions.create({
+      plan_id: plan.price.priceIds.test, // You'll need to add this to your PLANS config
+      customer_notify: true,
+      quantity: 1,
+      total_count: 12, // For annual subscription, adjust as needed
+      // start_at: omitted - will start immediately after first payment
       notes: {
         userId: userId,
         planType: plan.name,
@@ -233,9 +233,8 @@ createRazorpaySession: privateProcedure.mutation(async ({ ctx }) => {
     });
 
     return {
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
+      subscriptionId: subscription.id,
+      planId: subscription.plan_id,
       customerId: customerId,
       customerDetails: {
         name: dbUser.firstName || "Customer",
@@ -243,14 +242,17 @@ createRazorpaySession: privateProcedure.mutation(async ({ ctx }) => {
         contact: undefined,
       },
       billingUrl,
-      isAlreadySubscribed: false
+      isAlreadySubscribed: false,
+      status: subscription.status,
+      currentStart: subscription.current_start,
+      currentEnd: subscription.current_end,
     };
 
   } catch (error) {
-    console.error("Razorpay order creation failed:", error);
+    console.error("Razorpay subscription creation failed:", error);
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: "Failed to create order. Please try again.",
+      message: "Failed to create subscription. Please try again.",
     });
   }
 }),

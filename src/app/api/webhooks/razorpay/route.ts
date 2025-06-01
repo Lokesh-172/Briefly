@@ -31,123 +31,167 @@ export async function POST(req: NextRequest) {
  
     console.log('Webhook event received:', event.event) 
  
-    // Handle payment.authorized event
-    if (event.event === 'payment.authorized' && event.payload?.payment?.entity) {
+    // Handle subscription.authenticated event
+    if (event.event === 'subscription.authenticated' && event.payload?.subscription?.entity) {
+      const subscriptionEntity = event.payload.subscription.entity
+      const customerId = subscriptionEntity.customer_id
+      const subscriptionId = subscriptionEntity.id
+      const planId = subscriptionEntity.plan_id
+
+      console.log('Processing subscription.authenticated:', {
+        subscriptionId,
+        customerId,
+        planId,
+        status: subscriptionEntity.status
+      })
+
+      if (!customerId || !subscriptionId || !planId) {
+        console.error('Missing required subscription data:', {
+          customerId,
+          subscriptionId,
+          planId
+        })
+        return new Response('Missing subscription data', { status: 400 })
+      }
+
+      try {
+        // Calculate period end based on start_at and plan duration
+        // For now, we'll use a default period (you might want to fetch plan details for accurate duration)
+        const startAt = subscriptionEntity.start_at || subscriptionEntity.charge_at
+        const periodEnd = new Date((startAt + (30 * 24 * 60 * 60)) * 1000) // Default 30 days, adjust based on your plan
+
+        // Update user subscription details in your DB
+        const updatedUser = await db.user.update({
+          where: {
+            razorpayCustomerId: customerId,
+          },
+          data: {
+            razorpaySubscriptionId: subscriptionId,
+            razorpayPriceId: planId,
+            razorpayCurrentPeriodEnd: periodEnd,
+          },
+        })
+
+        console.log('Successfully updated user subscription:', {
+          userId: updatedUser.id,
+          customerId,
+          subscriptionId,
+          planId
+        })
+
+      } catch (dbError) {
+        console.error('Database update error for subscription.authenticated:', dbError)
+        return new Response('Database error', { status: 500 })
+      }
+    }
+    
+    // Handle subscription.activated event (when first payment is successful)
+    else if (event.event === 'subscription.activated' && event.payload?.subscription?.entity) {
+      const subscriptionEntity = event.payload.subscription.entity
+      const customerId = subscriptionEntity.customer_id
+      const subscriptionId = subscriptionEntity.id
+      const currentEnd = subscriptionEntity.current_end
+
+      console.log('Processing subscription.activated:', {
+        subscriptionId,
+        customerId,
+        currentEnd
+      })
+
+      if (currentEnd && customerId) {
+        try {
+          await db.user.update({
+            where: {
+              razorpayCustomerId: customerId,
+            },
+            data: {
+              razorpayCurrentPeriodEnd: new Date(currentEnd * 1000),
+            },
+          })
+
+          console.log('Successfully updated subscription period end for customer:', customerId)
+        } catch (dbError) {
+          console.error('Database update error for subscription.activated:', dbError)
+        }
+      }
+    }
+    
+    // Handle subscription.charged event (recurring payments)
+    else if (event.event === 'subscription.charged' && event.payload?.subscription?.entity) {
+      const subscriptionEntity = event.payload.subscription.entity
+      const customerId = subscriptionEntity.customer_id
+      const currentEnd = subscriptionEntity.current_end
+
+      console.log('Processing subscription.charged:', {
+        subscriptionId: subscriptionEntity.id,
+        customerId,
+        currentEnd
+      })
+
+      if (currentEnd && customerId) {
+        try {
+          await db.user.update({
+            where: {
+              razorpayCustomerId: customerId,
+            },
+            data: {
+              razorpayCurrentPeriodEnd: new Date(currentEnd * 1000),
+            },
+          })
+
+          console.log('Successfully updated subscription after charge for customer:', customerId)
+        } catch (dbError) {
+          console.error('Database update error for subscription.charged:', dbError)
+        }
+      }
+    }
+    
+    // Handle subscription.cancelled event
+    else if (event.event === 'subscription.cancelled' && event.payload?.subscription?.entity) {
+      const subscriptionEntity = event.payload.subscription.entity
+      const customerId = subscriptionEntity.customer_id
+
+      console.log('Processing subscription.cancelled for customer:', customerId)
+
+      if (customerId) {
+        try {
+          await db.user.update({
+            where: {
+              razorpayCustomerId: customerId,
+            },
+            data: {
+              razorpaySubscriptionId: null,
+              razorpayPriceId: null,
+              razorpayCurrentPeriodEnd: null,
+            },
+          })
+
+          console.log('Successfully cancelled subscription for customer:', customerId)
+        } catch (dbError) {
+          console.error('Database update error for subscription.cancelled:', dbError)
+        }
+      }
+    }
+    
+    // Handle legacy payment.authorized event (for backward compatibility)
+    else if (event.event === 'payment.authorized' && event.payload?.payment?.entity) {
       const paymentEntity = event.payload.payment.entity
       const orderId = paymentEntity.order_id
       const customerId = paymentEntity.customer_id
+
+      console.log('Processing legacy payment.authorized event:', { orderId, customerId })
 
       if (!orderId) {
         console.error('Missing order ID in payment:', paymentEntity.id)
         return new Response('Missing order ID', { status: 400 })
       }
 
-      try {
-        // Fetch order details from Razorpay
-        const orderRes = await fetch(
-          `https://api.razorpay.com/v1/orders/${orderId}`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization:
-                'Basic ' +
-                Buffer.from(
-                  process.env.NEXT_PUBLIC_RAZORPAY_API_KEY + ':' + process.env.RAZORPAY_SECRET
-                ).toString('base64'),
-            },
-          }
-        )
-
-        if (!orderRes.ok) {
-          throw new Error(`Razorpay Order API error: ${orderRes.status}`)
-        }
-
-        const order = await orderRes.json()
-        console.log('Order details:', order)
-
-        // Get customer ID from order notes or payment
-        const orderCustomerId = order.notes?.customerId || customerId
-        
-        if (orderCustomerId) {
-          console.log('Customer ID found:', orderCustomerId)
-
-          // Fetch all subscriptions and filter by customer (since direct customer filter might not be supported)
-          const subscriptionsRes = await fetch(
-            `https://api.razorpay.com/v1/subscriptions`,
-            {
-              method: 'GET',
-              headers: {
-                Authorization:
-                  'Basic ' +
-                  Buffer.from(
-                    process.env.NEXT_PUBLIC_RAZORPAY_API_KEY + ':' + process.env.RAZORPAY_SECRET
-                  ).toString('base64'),
-              },
-            }
-          )
-
-          if (!subscriptionsRes.ok) {
-            throw new Error(`Razorpay Subscriptions API error: ${subscriptionsRes.status}`)
-          }
-
-          const subscriptionsData = await subscriptionsRes.json()
-          console.log('All subscriptions fetched, filtering by customer ID')
-
-          // Filter subscriptions by customer ID
-          const customerSubscriptions = subscriptionsData.items?.filter(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (sub: any) => sub.customer_id === orderCustomerId
-          ) || []
-
-          console.log('Customer subscriptions found:', customerSubscriptions.length)
-          console.log('Customer subscriptions:', customerSubscriptions)
-
-          if (customerSubscriptions.length === 0) {
-            console.log('No subscriptions found for customer:', orderCustomerId)
-            return new Response(null, { status: 200 })
-          }
-
-          // Get the most recent active subscription, or the most recently created one
-          const activeSubscription = customerSubscriptions.find(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (sub: any) => sub.status === 'active' || sub.status === 'authenticated'|| sub.status ==='created'
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ) || customerSubscriptions.sort((a: any, b: any) => b.created_at - a.created_at)[0]
-
-          if (activeSubscription) {
-            console.log('Subscription found:', activeSubscription)
-
-          if (!activeSubscription.id || !activeSubscription.plan_id || !activeSubscription.current_end) {
-            console.error('Invalid subscription data:', activeSubscription)
-            return new Response('Invalid subscription data', { status: 400 })
-          }
-
-          // Update user subscription details in your DB
-          await db.user.update({
-            where: {
-              razorpayCustomerId: orderCustomerId,
-            },
-            data: {
-              razorpaySubscriptionId: activeSubscription.id,
-              razorpayPriceId: activeSubscription.plan_id,
-              razorpayCurrentPeriodEnd: new Date(activeSubscription.current_end * 1000),
-            },
-          })
-
-          console.log('Successfully updated user subscription for customer:', orderCustomerId)
-        } else {
-          console.log('No subscriptions found for customer:', orderCustomerId)
-        }
-      } else {
-        console.log('No customer ID found in order or payment')
-      }
-
-      } catch (apiError) {
-        console.error('Error processing payment.authorized webhook:', apiError)
-        return new Response('Internal server error', { status: 500 })
-      }
-    } else {
-      console.log('Unhandled event type or missing payment payload:', event.event)
+      // Your existing payment.authorized logic here if needed for one-time payments
+      console.log('Legacy payment processing - consider migrating to subscription events')
+    }
+    
+    else {
+      console.log('Unhandled event type:', event.event)
     }
  
     return new Response(null, { status: 200 }) 

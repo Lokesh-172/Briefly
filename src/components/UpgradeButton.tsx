@@ -1,103 +1,103 @@
-"use client"
+"use client";
 
-import { ArrowRight } from 'lucide-react'
-import { Button } from './ui/button'
-import { trpc } from '@/app/_trpc/client'
-import { toast } from 'sonner' // Make sure you have sonner installed
-import { useState } from 'react'
+import { ArrowRight } from "lucide-react";
+import { Button } from "./ui/button";
+import { trpc } from "@/app/_trpc/client";
+import { toast } from "sonner";
+import { useState } from "react";
 
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Razorpay: any;
   }
 }
 
 const UpgradeButton = () => {
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false);
 
   const { mutate: createRazorpaySession } = trpc.createRazorpaySession.useMutation({
     onSuccess: (data) => {
-      setIsLoading(false)
-      
+      setIsLoading(false);
+
       if (data.isAlreadySubscribed) {
-        toast.info("You're already subscribed!")
-        window.location.href = data.billingUrl
-        return
+        toast.info("You're already subscribed!");
+        window.location.href = data.billingUrl;
+        return;
       }
-      const razorpayAPIKEY = process.env.NEXT_PUBLIC_RAZORPAY_API_KEY ;
-      if(!razorpayAPIKEY){
-        toast.error( "NO API KEY")
+
+      const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_API_KEY!;
+      if (!razorpayKey) {
+        toast.error("Razorpay API key missing");
+        return;
       }
+
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_API_KEY ,
-        amount: data.amount,
-        currency: data.currency,
-        name: "Briefly", // Replace with your app name
+        key: razorpayKey,
+        name: "Briefly",
         description: "Pro Plan Subscription",
-        order_id: data.orderId,
+        subscription_id: data.subscriptionId,
         prefill: {
           name: data.customerDetails?.name,
           email: data.customerDetails?.email,
         },
         theme: {
-          color: "#3399cc", // Your brand color
+          color: "#3399cc",
         },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        handler: function (response: any) {
-          toast.success("Payment successful! Activating your subscription...");
-          console.log(response);
-
-          window.location.href = data.billingUrl
+        handler: function () {
+          // Response will contain razorpay_payment_id, razorpay_subscription_id, razorpay_signature
+          toast.success("Subscription activated successfully!");
+          
+          // You might want to verify the subscription on your backend here
+          // before redirecting to billing
+          window.location.href = data.billingUrl;
         },
         modal: {
-          ondismiss: function() {
-            toast.info("Payment cancelled")
-          }
-        }
-      }
-      const razorpay = new window.Razorpay(options)
-      razorpay.open()
+          ondismiss: function () {
+            toast.info("Subscription setup cancelled");
+          },
+        },
+        subscription: {
+          // Additional subscription-specific options
+          auth_type: "otp", // or "netbanking" based on your preference
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
     },
     onError: (error) => {
-      setIsLoading(false)
-      toast.error(error.message || "Something went wrong")
-    }
-  })
+      setIsLoading(false);
+      toast.error(error.message || "Something went wrong");
+    },
+  });
 
   const handleUpgrade = async () => {
-    setIsLoading(true)
-    
-    // Load Razorpay script if not loaded
+    setIsLoading(true);
+
     if (!window.Razorpay) {
-      const script = document.createElement('script')
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-      script.onload = () => {
-        createRazorpaySession()
-      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => createRazorpaySession();
       script.onerror = () => {
-        setIsLoading(false)
-        toast.error("Failed to load payment gateway")
-      }
-      document.body.appendChild(script)
+        setIsLoading(false);
+        toast.error("Failed to load payment gateway");
+      };
+      document.body.appendChild(script);
     } else {
-      createRazorpaySession()
+      createRazorpaySession();
     }
-  }
+  };
 
   return (
-    <Button 
-      onClick={handleUpgrade}
-      disabled={isLoading}
-      className='w-full'
-    >
-      {isLoading ? "Processing..." : (
+    <Button onClick={handleUpgrade} disabled={isLoading} className="w-full">
+      {isLoading ? "Setting up subscription..." : (
         <>
-          Upgrade now <ArrowRight className='h-5 w-5 ml-1.5' />
+          Upgrade now <ArrowRight className="h-5 w-5 ml-1.5" />
         </>
       )}
     </Button>
-  )
-}
+  );
+};
 
-export default UpgradeButton
+export default UpgradeButton;
