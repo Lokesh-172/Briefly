@@ -27,17 +27,15 @@ export async function POST(req: NextRequest) {
     const event = JSON.parse(body)
     console.log('Webhook event received:', event.event)
 
+    // Use subscription payload for subscription events
     if (
-      event.event === 'payment.captured' ||
-      event.event === 'order.paid'
+      event.event.startsWith('subscription.') && // e.g. subscription.authenticated, subscription.activated etc
+      event.payload?.subscription?.entity
     ) {
-      const entity =
-        event.event === 'payment.captured'
-          ? event.payload.payment.entity
-          : event.payload.order.entity
+      const subscriptionEntity = event.payload.subscription.entity
 
-      const subscriptionId = entity.subscription_id
-      const customerId = entity.customer_id
+      const subscriptionId = subscriptionEntity.id
+      const customerId = subscriptionEntity.customer_id
 
       if (!subscriptionId || !customerId) {
         console.error('Missing subscription or customer ID:', { subscriptionId, customerId })
@@ -70,7 +68,7 @@ export async function POST(req: NextRequest) {
           return new Response('Invalid subscription data', { status: 400 })
         }
 
-        // Update user subscription details
+        // Update user subscription details in your DB
         await db.user.update({
           where: {
             razorpayCustomerId: customerId,
@@ -87,6 +85,8 @@ export async function POST(req: NextRequest) {
         console.error('Error fetching subscription or updating database:', apiError)
         return new Response('Internal server error', { status: 500 })
       }
+    } else {
+      console.log('Unhandled event type or missing subscription payload:', event.event)
     }
 
     return new Response(null, { status: 200 })
