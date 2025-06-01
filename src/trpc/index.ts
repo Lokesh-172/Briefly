@@ -6,7 +6,6 @@ import { z } from "zod";
 import { UTApi } from "uploadthing/server";
 import { INFINITE_QUERY_LIMT } from "@/config/infinite-query";
 import pinecone from "@/lib/pinecone";
-import { absoluteUrl } from "@/lib/utils";
 import { getUserSubscriptionPlan, razorpay } from "@/lib/razorpay";
 import { PLANS } from "@/config/razorpay";
 
