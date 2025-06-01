@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     // Handle subscription.authenticated event
     if (event.event === 'subscription.authenticated' && event.payload?.subscription?.entity) {
       const subscriptionEntity = event.payload.subscription.entity
-      const customerId = subscriptionEntity.customer_id
+      const customerId = subscriptionEntity.notes.customerId
       const subscriptionId = subscriptionEntity.id
       const planId = subscriptionEntity.plan_id
 
@@ -88,7 +88,8 @@ export async function POST(req: NextRequest) {
     // Handle subscription.activated event (when first payment is successful)
     else if (event.event === 'subscription.activated' && event.payload?.subscription?.entity) {
       const subscriptionEntity = event.payload.subscription.entity
-      const customerId = subscriptionEntity.customer_id
+      // Get customerId from notes instead of customer_id (which is null)
+      const customerId = subscriptionEntity.notes?.customerId
       const subscriptionId = subscriptionEntity.id
       const currentEnd = subscriptionEntity.current_end
 
@@ -113,13 +114,19 @@ export async function POST(req: NextRequest) {
         } catch (dbError) {
           console.error('Database update error for subscription.activated:', dbError)
         }
+      } else {
+        console.error('Missing customerId or currentEnd in subscription.activated:', {
+          customerId,
+          currentEnd
+        })
       }
     }
     
     // Handle subscription.charged event (recurring payments)
     else if (event.event === 'subscription.charged' && event.payload?.subscription?.entity) {
       const subscriptionEntity = event.payload.subscription.entity
-      const customerId = subscriptionEntity.customer_id
+      // Get customerId from notes instead of customer_id (which might be null)
+      const customerId = subscriptionEntity.notes?.customerId || subscriptionEntity.customer_id
       const currentEnd = subscriptionEntity.current_end
 
       console.log('Processing subscription.charged:', {
@@ -149,7 +156,8 @@ export async function POST(req: NextRequest) {
     // Handle subscription.cancelled event
     else if (event.event === 'subscription.cancelled' && event.payload?.subscription?.entity) {
       const subscriptionEntity = event.payload.subscription.entity
-      const customerId = subscriptionEntity.customer_id
+      // Get customerId from notes instead of customer_id (which might be null)
+      const customerId = subscriptionEntity.notes?.customerId || subscriptionEntity.customer_id
 
       console.log('Processing subscription.cancelled for customer:', customerId)
 
