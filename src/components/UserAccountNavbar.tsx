@@ -12,6 +12,7 @@ import Link from "next/link";
 import { Gem, LogOut, Settings } from "lucide-react";
 import { LogoutLink } from "@kinde-oss/kinde-auth-nextjs/server";
 import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
+import { getUserSubscriptionPlan } from "@/lib/razorpay";
 
 interface UserAccountNavProps {
   email: string | undefined;
@@ -25,7 +26,7 @@ const UserAccountNav = async ({
   name,
 }: UserAccountNavProps) => {
   console.log(imageUrl);
-
+const subscriptionPlan = await getUserSubscriptionPlan()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -70,10 +71,16 @@ const UserAccountNav = async ({
         </DropdownMenuItem>
 
         <DropdownMenuItem asChild>
-          <Link href="/pricing" className="cursor-pointer">
-            <Gem className="mr-2 h-4 w-4 text-blue-600" />
-            <span>Upgrade</span>
-          </Link>
+          {subscriptionPlan?.isSubscribed ? (
+            <Link href='/dashboard/billing'>
+              Manage Subscription
+            </Link>
+          ) : (
+            <Link href='/pricing'>
+              Upgrade{' '}
+              <Gem className='text-blue-600 h-4 w-4 ml-1.5' />
+            </Link>
+          )}
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />

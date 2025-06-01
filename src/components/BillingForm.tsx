@@ -56,6 +56,7 @@ const BillingForm = ({
                 {subscriptionPlan.isCanceled
                   ? 'Your plan will be canceled on '
                   : 'Your plan renews on'}
+                  {' '}
                 {format(
                   subscriptionPlan.razorpayCurrentPeriodEnd!,
                   'dd.MM.yyyy'
