@@ -71,9 +71,9 @@ export async function POST(req: NextRequest) {
         if (orderCustomerId) {
           console.log('Customer ID found:', orderCustomerId)
 
-          // Fetch subscriptions for this customer
+          // Fetch all subscriptions and filter by customer (since direct customer filter might not be supported)
           const subscriptionsRes = await fetch(
-            `https://api.razorpay.com/v1/subscriptions?customer_id=${orderCustomerId}`,
+            `https://api.razorpay.com/v1/subscriptions`,
             {
               method: 'GET',
               headers: {
@@ -91,13 +91,27 @@ export async function POST(req: NextRequest) {
           }
 
           const subscriptionsData = await subscriptionsRes.json()
-          console.log('Customer subscriptions:', subscriptionsData)
+          console.log('All subscriptions fetched, filtering by customer ID')
 
-          // Get the most recent active subscription
-          const activeSubscription = subscriptionsData.items?.find(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (sub: any) => sub.status === 'active' || sub.status === 'authenticated' || sub.status === 'created'
-          ) || subscriptionsData.items?.[0] // fallback to first subscription if none active
+          // Filter subscriptions by customer ID
+          const customerSubscriptions = subscriptionsData.items?.filter(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (sub: any) => sub.customer_id === orderCustomerId
+          ) || []
+
+          console.log('Customer subscriptions found:', customerSubscriptions.length)
+          console.log('Customer subscriptions:', customerSubscriptions)
+
+          if (customerSubscriptions.length === 0) {
+            console.log('No subscriptions found for customer:', orderCustomerId)
+            return new Response(null, { status: 200 })
+          }
+
+          // Get the most recent active subscription, or the most recently created one
+          const activeSubscription = customerSubscriptions.find(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (sub: any) => sub.status === 'active' || sub.status === 'authenticated'|| sub.status ==='created'
+          ) || customerSubscriptions.sort((a: any, b: any) => b.created_at - a.created_at)[0]
 
           if (activeSubscription) {
             console.log('Subscription found:', activeSubscription)
