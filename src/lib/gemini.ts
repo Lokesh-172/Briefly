@@ -9,6 +9,6 @@ if (!GEMINI_API_KEY) {
 // Initialize the GoogleGenerativeAI client
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-const ai = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const ai = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 export default ai;
