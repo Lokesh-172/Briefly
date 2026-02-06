@@ -11,18 +11,20 @@ import { toast } from "sonner";
 import { trpc } from "@/app/_trpc/client";
 import { useRouter } from "next/navigation";
 
-const UploadDropzone = ({isSubscribed} : {isSubscribed :boolean}) => {
+const UploadDropzone = ({ isSubscribed }: { isSubscribed: boolean }) => {
   const router = useRouter();
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
-  const { startUpload } = useUploadThing(isSubscribed ? "proPlanUploader" : "freePlanUploader");
+  const { startUpload } = useUploadThing(
+    isSubscribed ? "proPlanUploader" : "freePlanUploader",
+  );
 
   const { mutate: startPolling } = trpc.getFile.useMutation({
     onSuccess: (file) => {
       router.push(`/dashboard/${file.id}`);
     },
-    retry: true,
-    retryDelay: 500,
+    retry: 10,
+    retryDelay: 1000,
   });
   const startSimulatedProgress = () => {
     setUploadProgress(0);
@@ -77,17 +79,16 @@ const UploadDropzone = ({isSubscribed} : {isSubscribed :boolean}) => {
             className="border h-64 m-4 border-dashed border-gray-300 rounded-lg"
           >
             <div className="flex items-center justify-center h-full w-full">
-              <label
-                htmlFor="dropzone-file"
-                className="flex flex-col items-center justify-center w-full h-full rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-              >
+              <div className="flex flex-col items-center justify-center w-full h-full rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
                 <div className="flex flex-col justify-center items-center pt-5 pb-6">
                   <Cloud className="h-6 w-6 text-zinc-500 mb-2" />
                   <p className="mb-2 text-sm text-zinc-700">
                     <span className="font-semibold">Click to upload</span> or
                     drag and drop
                   </p>
-                  <p className="text-xs text-zinc-500">PDF (upto {isSubscribed ? "16" : "4"} MB)</p>
+                  <p className="text-xs text-zinc-500">
+                    PDF (upto {isSubscribed ? "16" : "4"} MB)
+                  </p>
                 </div>
                 {acceptedFiles && acceptedFiles[0] ? (
                   <div className="max-w-xs bg-white flex items-center rounded-md overflow-hidden outline-[1px] outline-zinc-200 divide-x divide-zinc-200">
@@ -104,19 +105,14 @@ const UploadDropzone = ({isSubscribed} : {isSubscribed :boolean}) => {
                     <Progress value={uploadProgress} />
                     {uploadProgress === 100 ? (
                       <div className="flex gap-1 items-center justify-center text-sm text-zinc-700 text-center pt-2">
-                        <Loader2 className="h-3 w-3 animate-spin"/>
+                        <Loader2 className="h-3 w-3 animate-spin" />
                         Redirecting....
                       </div>
                     ) : null}
                   </div>
                 ) : null}
-                <input
-                  {...getInputProps()}
-                  type="file"
-                  id="dropzone-file"
-                  className="hidden"
-                />
-              </label>
+                <input {...getInputProps()} type="file" className="hidden" />
+              </div>
             </div>
           </div>
         );
@@ -125,7 +121,7 @@ const UploadDropzone = ({isSubscribed} : {isSubscribed :boolean}) => {
   );
 };
 
-const UploadButton = ({isSubscribed} : {isSubscribed: boolean}) => {
+const UploadButton = ({ isSubscribed }: { isSubscribed: boolean }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   return (

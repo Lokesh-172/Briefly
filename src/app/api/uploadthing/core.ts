@@ -13,143 +13,163 @@ import { PLANS } from "@/config/razorpay";
 const f = createUploadthing();
 
 const middleware = async () => {
-  const { getUser } = getKindeServerSession()
-  const user = await getUser()
+  const { getUser } = getKindeServerSession();
+  const user = await getUser();
 
-  if (!user || !user.id) throw new Error('Unauthorized')
+  if (!user || !user.id) throw new Error("Unauthorized");
 
-  const subscriptionPlan = await getUserSubscriptionPlan()
+  const subscriptionPlan = await getUserSubscriptionPlan();
 
-  return { subscriptionPlan, userId: user.id }
-}
+  return { subscriptionPlan, userId: user.id };
+};
 
 const onUploadComplete = async ({
   metadata,
   file,
 }: {
-  metadata: Awaited<ReturnType<typeof middleware>>
+  metadata: Awaited<ReturnType<typeof middleware>>;
   file: {
-    key: string
-    name: string
-    ufsUrl: string
-  }
+    key: string;
+    name: string;
+    ufsUrl: string;
+  };
 }) => {
   const isFileExist = await db.file.findFirst({
     where: {
       key: file.key,
     },
-  })
-    if (isFileExist) return
-    let createdFileId: string | undefined;
+  });
+  if (isFileExist) return;
+  let createdFileId: string | undefined;
 
-      try {
-        const createdFile = await db.file.create({
-          data: {
-            key: file.key,
-            name: file.name,
-            userId: metadata.userId,
-            url: file.ufsUrl,
-            uploadStaus: "PROCESSING",
-          },
-        });
-        createdFileId = createdFile.id;
+  try {
+    const createdFile = await db.file.create({
+      data: {
+        key: file.key,
+        name: file.name,
+        userId: metadata.userId,
+        url: file.ufsUrl,
+        uploadStaus: "PROCESSING",
+      },
+    });
+    createdFileId = createdFile.id;
 
-        // Fetch the PDF file
-        const response = await fetch(file.ufsUrl);
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch PDF: ${response.statusText} (${response.status})`
-          );
-        }
-        const blob = await response.blob();
+    // Fetch the PDF file
+    const response = await fetch(file.ufsUrl);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch PDF: ${response.statusText} (${response.status})`,
+      );
+    }
+    const blob = await response.blob();
 
-        // Load PDF document
-        const loader = new PDFLoader(blob);
-        const pageLevelDocs = await loader.load();
-        const { subscriptionPlan } = metadata;
-        const { isSubscribed } = subscriptionPlan;
-        const pagesAmt = pageLevelDocs.length;
+    // Load PDF document
+    const loader = new PDFLoader(blob);
+    const pageLevelDocs = await loader.load();
 
-        const isProExceeded =
-          pagesAmt > PLANS.find((plan) => plan.name === "Pro")!.pagesPerPdf;
-        const isFreeExceeded =
-          pagesAmt > PLANS.find((plan) => plan.name === "Free")!.pagesPerPdf;
+    // Filter out empty documents (pages with no text content)
+    const validDocs = pageLevelDocs.filter(
+      (doc) => doc.pageContent && doc.pageContent.trim().length > 0,
+    );
 
-        if (
-          (isSubscribed && isProExceeded) ||
-          (!isSubscribed && isFreeExceeded)
-        ) {
-          await db.file.update({
-            data: {
-              uploadStaus: "FAILED",
-            },
-            where: {
-              id: createdFile.id,
-            },
-          });
-        }
+    console.log(
+      `Total pages: ${pageLevelDocs.length}, Pages with text: ${validDocs.length}`,
+    );
 
-        // Initialize embeddings
-        const googleApiKey = process.env.GEMINI_API_KEY;
-        if (!googleApiKey) {
-          throw new Error(
-            "GOOGLE_GENAI_API_KEY is not set in environment variables."
-          );
-        }
-        const embeddings = new GoogleGenerativeAIEmbeddings({
-          apiKey: googleApiKey,
-          model: "text-embedding-004",
-          taskType: TaskType.RETRIEVAL_DOCUMENT,
-          title: file.name,
-        });
+    if (validDocs.length === 0) {
+      console.log("No extractable text found in PDF");
+      await db.file.update({
+        data: {
+          uploadStaus: "FAILED",
+        },
+        where: {
+          id: createdFile.id,
+        },
+      });
+      return;
+    }
 
-        // Initialize Pinecone and store documents
-        const pineconeClient = pinecone; // Use the imported Pinecone client instance directly
-        const pineconeIndex = pineconeClient.Index("briefly"); // Get the specific index
+    const { subscriptionPlan } = metadata;
+    const { isSubscribed } = subscriptionPlan;
+    const pagesAmt = pageLevelDocs.length;
 
-        console.log(
-          `Storing documents in Pinecone with namespace: ${createdFile.id}`
-        );
-        await PineconeStore.fromDocuments(pageLevelDocs, embeddings, {
-          pineconeIndex,
-          namespace: createdFile.id,
-        });
+    const isProExceeded =
+      pagesAmt > PLANS.find((plan) => plan.name === "Pro")!.pagesPerPdf;
+    const isFreeExceeded =
+      pagesAmt > PLANS.find((plan) => plan.name === "Free")!.pagesPerPdf;
 
-        // Update file status to SUCCESS
-        if (createdFileId) {
-          await db.file.update({
-            data: {
-              uploadStaus: "SUCCESS",
-            },
-            where: {
-              id: createdFileId,
-            },
-          });
-        }
-      } catch (error) {
-        console.log(error);
-        // Update file status to FAILED if an ID is available
-        if (createdFileId) {
-          await db.file.update({
-            data: {
-              uploadStaus: "FAILED",
-            },
-            where: {
-              id: createdFileId,
-            },
-          });
-        }
-      }
-}
+    if ((isSubscribed && isProExceeded) || (!isSubscribed && isFreeExceeded)) {
+      await db.file.update({
+        data: {
+          uploadStaus: "FAILED",
+        },
+        where: {
+          id: createdFile.id,
+        },
+      });
+      return;
+    }
+
+    // Initialize embeddings
+    const googleApiKey = process.env.GEMINI_API_KEY;
+    if (!googleApiKey) {
+      throw new Error(
+        "GOOGLE_GENAI_API_KEY is not set in environment variables.",
+      );
+    }
+    const embeddings = new GoogleGenerativeAIEmbeddings({
+      apiKey: googleApiKey,
+      model: "gemini-embedding-001",
+      taskType: TaskType.RETRIEVAL_DOCUMENT,
+      title: file.name,
+    });
+
+    // Initialize Pinecone and store documents
+    const pineconeClient = pinecone; // Use the imported Pinecone client instance directly
+    const pineconeIndex = pineconeClient.Index("briefly-3072"); // Get the specific index
+
+    console.log(
+      `Storing documents in Pinecone with namespace: ${createdFile.id}`,
+    );
+    await PineconeStore.fromDocuments(validDocs, embeddings, {
+      pineconeIndex,
+      namespace: createdFile.id,
+    });
+
+    // Update file status to SUCCESS
+    if (createdFileId) {
+      await db.file.update({
+        data: {
+          uploadStaus: "SUCCESS",
+        },
+        where: {
+          id: createdFileId,
+        },
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    // Update file status to FAILED if an ID is available
+    if (createdFileId) {
+      await db.file.update({
+        data: {
+          uploadStaus: "FAILED",
+        },
+        where: {
+          id: createdFileId,
+        },
+      });
+    }
+  }
+};
 
 export const ourFileRouter = {
-  freePlanUploader: f({ pdf: { maxFileSize: '4MB' } })
+  freePlanUploader: f({ pdf: { maxFileSize: "4MB" } })
     .middleware(middleware)
     .onUploadComplete(onUploadComplete),
-  proPlanUploader: f({ pdf: { maxFileSize: '16MB' } })
+  proPlanUploader: f({ pdf: { maxFileSize: "16MB" } })
     .middleware(middleware)
     .onUploadComplete(onUploadComplete),
-} satisfies FileRouter
+} satisfies FileRouter;
 
 export type OurFileRouter = typeof ourFileRouter;
-  

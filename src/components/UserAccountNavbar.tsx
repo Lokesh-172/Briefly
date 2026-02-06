@@ -11,7 +11,7 @@ import { Icons } from "./Icons";
 import Link from "next/link";
 import { Gem, LogOut, Settings } from "lucide-react";
 import { LogoutLink } from "@kinde-oss/kinde-auth-nextjs/server";
-import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/Avatar";
 import { getUserSubscriptionPlan } from "@/lib/razorpay";
 
 interface UserAccountNavProps {
@@ -26,25 +26,24 @@ const UserAccountNav = async ({
   name,
 }: UserAccountNavProps) => {
   console.log(imageUrl);
-const subscriptionPlan = await getUserSubscriptionPlan()
+  const subscriptionPlan = await getUserSubscriptionPlan();
+  
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full cursor-pointer">
           <Avatar className="h-8 w-8">
-            <Avatar className="h-8 w-8">
-              {imageUrl && !imageUrl.endsWith("=blank&size=200") ? (
-                <AvatarImage
-                  src={imageUrl}
-                  alt="profile picture"
-                  className="h-8 w-8 rounded-full"
-                />
-              ) : (
-                <AvatarFallback className="h-8 w-8 flex items-center justify-center rounded-full bg-muted">
-                  <Icons.user className="h-4 w-4 text-zinc-900" />
-                </AvatarFallback>
-              )}
-            </Avatar>
+            {imageUrl && !imageUrl.endsWith("=blank&size=200") ? (
+              <AvatarImage
+                src={imageUrl}
+                alt="profile picture"
+                className="h-8 w-8 rounded-full"
+              />
+            ) : (
+              <AvatarFallback className="h-8 w-8 flex items-center justify-center rounded-full bg-slate-200">
+                <Icons.user className="h-4 w-4 text-slate-600" />
+              </AvatarFallback>
+            )}
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
@@ -72,13 +71,13 @@ const subscriptionPlan = await getUserSubscriptionPlan()
 
         <DropdownMenuItem asChild>
           {subscriptionPlan?.isSubscribed ? (
-            <Link href='/dashboard/billing'>
+            <Link href="/dashboard/billing" className="cursor-pointer">
               Manage Subscription
             </Link>
           ) : (
-            <Link href='/pricing'>
-              Upgrade{' '}
-              <Gem className='text-blue-600 h-4 w-4 ml-1.5' />
+            <Link href="/pricing" className="cursor-pointer">
+              Upgrade{" "}
+              <Gem className="text-blue-600 h-4 w-4 ml-1.5" />
             </Link>
           )}
         </DropdownMenuItem>
