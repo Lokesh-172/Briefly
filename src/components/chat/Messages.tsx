@@ -3,7 +3,7 @@ import { INFINITE_QUERY_LIMT } from "@/config/infinite-query";
 import { Loader2, MessageSquare } from "lucide-react";
 import Skeleton from "react-loading-skeleton";
 import Message from "./Message";
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useRef } from "react";
 import { ChatContext } from "./ChatContext";
 import { useIntersection } from "@mantine/hooks";
 import { keepPreviousData } from "@tanstack/react-query";
@@ -14,7 +14,8 @@ interface MessagesProps {
 
 const Messages = ({ fileId }: MessagesProps) => {
   const { isLoading: isAiThinking } = useContext(ChatContext);
-  
+  const bottomRef = useRef<HTMLDivElement>(null);
+
   // Add hasNextPage and isFetchingNextPage to prevent unnecessary calls
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     trpc.getFileMessages.useInfiniteQuery(
@@ -25,7 +26,7 @@ const Messages = ({ fileId }: MessagesProps) => {
       {
         getNextPageParam: (lastPage) => lastPage?.nextCursor,
         placeholderData: keepPreviousData,
-      }
+      },
     );
 
   const messages = data?.pages.flatMap((page) => page.messages);
@@ -55,15 +56,23 @@ const Messages = ({ fileId }: MessagesProps) => {
   useEffect(() => {
     // Add proper conditions to prevent unnecessary API calls
     if (entry?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-      console.log('Fetching next page...'); // Debug log
+      console.log("Fetching next page..."); // Debug log
       fetchNextPage();
     }
   }, [entry, fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  // Auto-scroll to bottom when new messages arrive or AI is thinking
+  useEffect(() => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [combinedMessages, isAiThinking]);
 
   return (
     <div className="flex max-h-[calc(100vh-3.5rem-7rem)] border-zinc-200 flex-1 flex-col-reverse gap-4 p-3 overflow-y-auto scrollbar-thumb-blue scrollbar-thumb-rounded scrollbar-track-blue-lighter scrollbar-w-2 scrolling-touch">
       {combinedMessages && combinedMessages.length > 0 ? (
         <>
+          <div ref={bottomRef} />
           {combinedMessages.map((message, i) => {
             const isNextMessageSamePerson =
               combinedMessages[i - 1]?.isUserMessage ===
@@ -76,13 +85,13 @@ const Messages = ({ fileId }: MessagesProps) => {
               />
             );
           })}
-          
+
           {/* Trigger element for infinite scroll - placed at the end (top due to flex-col-reverse) */}
           {hasNextPage && (
-            <div 
-              ref={ref} 
+            <div
+              ref={ref}
               className="h-1 w-full"
-              style={{ background: 'transparent' }}
+              style={{ background: "transparent" }}
             />
           )}
         </>
@@ -102,7 +111,7 @@ const Messages = ({ fileId }: MessagesProps) => {
           </p>
         </div>
       )}
-      
+
       {/* Optional: Show loading indicator when fetching next page */}
       {isFetchingNextPage && (
         <div className="flex justify-center py-2">
