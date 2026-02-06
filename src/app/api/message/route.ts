@@ -43,16 +43,14 @@ export const POST = async (req: NextRequest) => {
       "GOOGLE_GENAI_API_KEY is not set in environment variables."
     );
   }
-
-  // This part correctly uses text-embedding-004 for semantic search
   const embeddings = new GoogleGenerativeAIEmbeddings({
     apiKey: googleApiKey,
-    model: "text-embedding-004", // Correct model for embeddings
+    model: "gemini-embedding-001", 
     taskType: TaskType.RETRIEVAL_DOCUMENT,
   });
 
   const pineconeClient = pinecone;
-  const pineconeIndex = pineconeClient.Index("briefly");
+  const pineconeIndex = pineconeClient.Index("briefly-3072");
 
   const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
     pineconeIndex,
